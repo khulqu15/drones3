@@ -1,0 +1,54 @@
+classdef flocking
+    properties
+        separation_weight
+        alignment_weight
+        cohesion_weight
+        neighbor_radius
+        max_velocity
+    end
+
+    methods
+        function obj = flocking(separation_weight, alignment_weight, cohesion_weight, neighbor_radius, max_velocity)
+            obj.separation_weight = separation_weight;
+            obj.alignment_weight = alignment_weight;
+            obj.cohesion_weight = cohesion_weight;
+            obj.neighbor_radius = neighbor_radius;
+            obj.max_velocity = max_velocity;
+        end
+
+        function [separation_force, alignment_force, cohesion_force] = calculate_forces(obj, drone_positions, drone_velocities, drone_index)
+            current_position = drone_positions(drone_index, :);
+            current_velocity = drone_velocities(drone_index, :);
+            
+            separation_force = [0, 0, 0];
+            alignment_force = [0, 0, 0];
+            cohesion_force = [0, 0, 0];
+
+            % Loop through all drones to find neighbors
+            for i = 1:size(drone_positions, 1)
+                if i ~= drone_index
+                    distance = norm(drone_positions(i, :) - current_position);
+                    if distance < obj.neighbor_radius
+                        separation_force = separation_force + (current_position - drone_positions(i, :)) / (distance^2);
+                        alignment_force = alignment_force + drone_velocities(i, :);
+                        cohesion_force = cohesion_force + drone_positions(i, :);
+                        num_neighbors = num_neighbors + 1;
+                    end
+                end
+                    % Normalize and scale the forces
+                if num_neighbors > 0
+                    % Calculate average alignment and cohesion
+                    alignment_force = alignment_force / num_neighbors;
+                    cohesion_force = cohesion_force / num_neighbors - current_position;
+                    
+                    % Apply weights to the forces
+                    separation_force = obj.separation_weight * separation_force;
+                    alignment_force = obj.alignment_weight * (alignment_force - current_velocity);
+                    cohesion_force = obj.cohesion_weight * cohesion_force;
+                end
+            end
+
+
+        end
+    end
+end
