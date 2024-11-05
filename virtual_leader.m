@@ -1,7 +1,7 @@
 classdef virtual_leader
     properties
-        position % [x, y, z]
-        velocity % [vx, vy, vz]
+        position
+        velocity
     end
 
     methods

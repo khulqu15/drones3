@@ -1,21 +1,10 @@
-%%
-% Azimuth: Sudut horizontal relatif terhadap sumbu X-Y, diukur searah jarum jam dari utara.
-% Elevation: Sudut vertikal relatif terhadap sumbu Z, diukur dari bidang X-Y.
-% velocity: Kecepatan konstan untuk semua drone.
-% acceleration: Akselerasi konstan (dapat dimodifikasi untuk model lebih kompleks).
-% omega: Kecepatan sudut untuk gerakan melingkar, dihitung dari radius dan kecepatan linier.
-% dmin: Batas jarak antar drone
-%%
 figure_handle = figure;
 
 r = 10;
 cx = 0;
 cy = 0;
 cz = 5;
-n_drones = 3;
-
-drone_positions = [cx + r * cos((2 * pi * (0:n_drones-1)) / n_drones); cy + r * sin((2 * pi * (0:n_drones-1)) / n_drones); cz * ones(1, n_drones)]';
-drone_velocities = zeros(n_drones, 3);
+n_drones = 25;
 
 velocity = 5;
 acceleration = 1;
@@ -26,20 +15,13 @@ mass = 1.0;
 k = 0.5;
 alpha = k * (gravity / mass);
 
+% TSMC Controller Initialization
 lambda = 2;
 eta = 1.5;
 k_tsmc = 1.0;
 u_max = 10;
 controller = twisted_sliding(lambda, eta, k_tsmc, u_max);
 
-separation_weight = 1.5;
-alignment_weight = 1.0;
-cohesion_weight = 1.0;
-neighbor_radius = 15;
-max_velocity = 5;
-flock_controller = flocking(separation_weight, alignment_weight, cohesion_weight, neighbor_radius, max_velocity);
-
-[azimuth_circle, elevation_circle] = bearing_measurement.bearing_circle(n_drones, r, cx, cy, cz);
 x_circle = cx + r * cos((2 * pi * (0:n_drones-1)) / n_drones);
 y_circle = cy + r * sin((2 * pi * (0:n_drones-1)) / n_drones);
 z_circle = cz * ones(1, n_drones);
@@ -47,7 +29,6 @@ z_circle = cz * ones(1, n_drones);
 a = 100;
 b = 50;
 
-[azimuth_ellipse, elevation_ellipse] = bearing_measurement.bearing_ellipse(n_drones, a, b, cx, cy, cz);
 x_ellipse = cx + a * cos((2 * pi * (0:n_drones-1)) / n_drones);
 y_ellipse = cy + b * sin((2 * pi * (0:n_drones-1)) / n_drones);
 z_ellipse = cz * ones(1, n_drones);
@@ -63,7 +44,21 @@ dt = 1;
 total_time = 50;
 time_steps = total_time / dt;
 
+% Initialize drone positions and velocities
+drone_positions = [cx + r * cos((2 * pi * (0:n_drones-1)) / n_drones); cy + r * sin((2 * pi * (0:n_drones-1)) / n_drones); cz * ones(1, n_drones)]';
+drone_velocities = zeros(n_drones, 3);  % Initially, drones are stationary
+
+% Flocking Controller Initialization
+separation_weight = 1.5;
+alignment_weight = 1.0;
+cohesion_weight = 1.0;
+neighbor_radius = 15;  % Radius to consider nearby drones
+max_velocity = 5;      % Maximum velocity for drones
+
+flock_controller = flocking(separation_weight, alignment_weight, cohesion_weight, neighbor_radius, max_velocity);
+
 for t = 1:time_steps
+    % TSMC for virtual leader control
     [u_x, s_x, ds_x] = controller.control(leader.position(1), leader_ref_position(1), leader.velocity(1), leader_ref_velocity(1));
     [u_y, s_y, ds_y] = controller.control(leader.position(2), leader_ref_position(2), leader.velocity(2), leader_ref_velocity(2));
     [u_z, s_z, ds_z] = controller.control(leader.position(3), leader_ref_position(3), leader.velocity(3), leader_ref_velocity(3));
@@ -75,25 +70,37 @@ for t = 1:time_steps
     cy = leader_pos(2);
     cz = leader_pos(3);
 
+%     for i = 1:n_drones
+%         fprintf('Drone %d Position: [%.2f, %.2f, %.2f]\n', i, drone_positions(i, 1), drone_positions(i, 2), drone_positions(i, 3));
+%         fprintf('Drone %d Velocity: [%.2f, %.2f, %.2f]\n', i, drone_velocities(i, 1), drone_velocities(i, 2), drone_velocities(i, 3));
+%     end
+
+    % Flocking forces update for each drone
+    for i = 1:n_drones
+        [separation_force, alignment_force, cohesion_force] = flock_controller.calculate_forces(drone_positions, drone_velocities, i);
+        % Update velocities using flocking behavior
+        drone_velocities(i, :) = flock_controller.apply_flocking(drone_velocities(i, :), separation_force, alignment_force, cohesion_force);
+    end
+
+    % Update the positions of the drones based on their velocities
+    % drone_positions = drone_positions + drone_velocities * dt;
+
+    % Update drone formation positions based on the leader position
     [azimuth_circle, elevation_circle] = bearing_measurement.bearing_circle(n_drones, r, cx, cy, cz);
     x_circle = cx + r * cos((2 * pi * (0:n_drones-1)) / n_drones);
     y_circle = cy + r * sin((2 * pi * (0:n_drones-1)) / n_drones);
     z_circle = cz * ones(1, n_drones);
 
+    % Plot the updated drone formation
     plotting.formation(x_circle, y_circle, z_circle, r, r, cz, ['Time: ', num2str(t*dt)], figure_handle, cx, cy);
-    
-    for i = 1:n_drones-1
-        [separation_force, alignment_force, cohesion_force] = flock_controller.calculate_forces(drone_positions, drone_velocities, i);
-        drone_velocities(i, :) = flock_controller.apply_flocking(drone_velocities(i, :), separation_force, alignment_force, cohesion_force);
-    end
-    drone_positions = drone_positions + drone_velocities * dt;
 
+    % Move leader based on time conditions
     if t <= 10
         leader = leader.move('forward', dt);
         if t == 10
             [x_circle, y_circle, z_circle, n_drones] = add_drone_to_formation(x_circle, y_circle, z_circle, n_drones, cx, cy, cz, r, figure_handle);
-            drone_positions = [x_circle', y_circle', z_circle'];
-            drone_velocities(n_drones, :) = [0, 0, 0];
+            drone_positions = [x_circle', y_circle', z_circle'];  % Update positions array
+            drone_velocities = [drone_velocities; zeros(1, 3)];
         end
     elseif t < 20
         leader = leader.move('left', dt);
@@ -103,20 +110,22 @@ for t = 1:time_steps
         leader = leader.move('backward', dt);
     end
 
+    % Adding and removing drones at certain times
     if t == 20
         [x_circle, y_circle, z_circle, n_drones] = add_drone_to_formation(x_circle, y_circle, z_circle, n_drones, cx, cy, cz, r, figure_handle);
-        drone_positions = [x_circle', y_circle', z_circle'];  % Update drone positions
-        drone_velocities(n_drones, :) = [0, 0, 0];  % Add new drone with zero initial velocity
+        drone_positions = [x_circle', y_circle', z_circle'];  % Update positions array
+        drone_velocities = [drone_velocities; zeros(1, 3)];
     end
-
     if t == 30 && n_drones > 1
-        [x_circle, y_circle, z_circle, n_drones] = remove_drone_from_formation(x_circle, y_circle, z_circle, n_drones, randi(n_drones), figure_handle, cx, cy, r, cz);
-        drone_positions = [x_circle', y_circle', z_circle'];  % Update drone positions
-        drone_velocities(n_drones + 1, :) = [];  % Remove corresponding velocity entry
+        drone_index_to_remove = randi(n_drones);  % Randomly select a drone to remove
+        [x_circle, y_circle, z_circle, n_drones] = remove_drone_from_formation(x_circle, y_circle, z_circle, n_drones, drone_index_to_remove, figure_handle, cx, cy, r, cz);
+        drone_positions(drone_index_to_remove, :) = [];  % Remove the corresponding position
+        drone_velocities(drone_index_to_remove, :) = []; % Remove the corresponding velocity
     end
 
     pause(0.1);
 end
+
 
 function [x_circle, y_circle, z_circle, n_drones] = add_drone_to_formation(x_circle, y_circle, z_circle, n_drones, cx, cy, cz, r, fig_handle)
     % Tambahkan drone baru
@@ -232,7 +241,3 @@ function [x_circle, y_circle, z_circle, n_drones] = remove_drone_from_formation(
         pause(0.05);  % Pause to make the movement smooth
     end
 end
-
-
-% plotting.formation(x_circle, y_circle, z_circle, r, r, cz, 'Drone Circle Formation');
-% plotting.formation(x_ellipse, y_ellipse, z_ellipse, a, b, cz, 'Drone Circle Formation');

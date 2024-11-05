@@ -1,18 +1,10 @@
-%%
-% Azimuth: Sudut horizontal relatif terhadap sumbu X-Y, diukur searah jarum jam dari utara.
-% Elevation: Sudut vertikal relatif terhadap sumbu Z, diukur dari bidang X-Y.
-% velocity: Kecepatan konstan untuk semua drone.
-% acceleration: Akselerasi konstan (dapat dimodifikasi untuk model lebih kompleks).
-% omega: Kecepatan sudut untuk gerakan melingkar, dihitung dari radius dan kecepatan linier.
-% dmin: Batas jarak antar drone
-%%
 figure_handle = figure;
 
 r = 10;
 cx = 0;
 cy = 0;
 cz = 5;
-n_drones = 3;
+n_drones = 25;
 
 velocity = 5;
 acceleration = 1;
@@ -30,7 +22,6 @@ k_tsmc = 1.0;
 u_max = 10;
 controller = twisted_sliding(lambda, eta, k_tsmc, u_max);
 
-[azimuth_circle, elevation_circle] = bearing_measurement.bearing_circle(n_drones, r, cx, cy, cz);
 x_circle = cx + r * cos((2 * pi * (0:n_drones-1)) / n_drones);
 y_circle = cy + r * sin((2 * pi * (0:n_drones-1)) / n_drones);
 z_circle = cz * ones(1, n_drones);
@@ -38,7 +29,6 @@ z_circle = cz * ones(1, n_drones);
 a = 100;
 b = 50;
 
-[azimuth_ellipse, elevation_ellipse] = bearing_measurement.bearing_ellipse(n_drones, a, b, cx, cy, cz);
 x_ellipse = cx + a * cos((2 * pi * (0:n_drones-1)) / n_drones);
 y_ellipse = cy + b * sin((2 * pi * (0:n_drones-1)) / n_drones);
 z_ellipse = cz * ones(1, n_drones);
@@ -80,10 +70,10 @@ for t = 1:time_steps
     cy = leader_pos(2);
     cz = leader_pos(3);
 
-    for i = 1:n_drones
-        fprintf('Drone %d Position: [%.2f, %.2f, %.2f]\n', i, drone_positions(i, 1), drone_positions(i, 2), drone_positions(i, 3));
-        fprintf('Drone %d Velocity: [%.2f, %.2f, %.2f]\n', i, drone_velocities(i, 1), drone_velocities(i, 2), drone_velocities(i, 3));
-    end
+%     for i = 1:n_drones
+%         fprintf('Drone %d Position: [%.2f, %.2f, %.2f]\n', i, drone_positions(i, 1), drone_positions(i, 2), drone_positions(i, 3));
+%         fprintf('Drone %d Velocity: [%.2f, %.2f, %.2f]\n', i, drone_velocities(i, 1), drone_velocities(i, 2), drone_velocities(i, 3));
+%     end
 
     % Flocking forces update for each drone
     for i = 1:n_drones
@@ -251,7 +241,3 @@ function [x_circle, y_circle, z_circle, n_drones] = remove_drone_from_formation(
         pause(0.05);  % Pause to make the movement smooth
     end
 end
-
-
-% plotting.formation(x_circle, y_circle, z_circle, r, r, cz, 'Drone Circle Formation');
-% plotting.formation(x_ellipse, y_ellipse, z_ellipse, a, b, cz, 'Drone Circle Formation');
