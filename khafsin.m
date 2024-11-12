@@ -44,27 +44,21 @@ start(t);
 cleanupObj = onCleanup(@() stop(t));
 
 function updateData(~, ~)
-    import matlab.net.http.RequestMessage
-    import matlab.net.http.field.AcceptField
-    import matlab.net.URI
-
-    endpoint = "https://khafsin.hayago.id/api/";
-
-    url = URI(endpoint + "imu");
-    header = [AcceptField("application/json")];
-    request = RequestMessage('GET', header);
-
-    response = request.send(url);
-    if response.StatusCode == matlab.net.http.StatusCode.OK
-        data = response.Body.Data;
+    endpoint = "https://khafsin.hayago.id/api/imu";    
+    options = weboptions('Timeout', 10, 'CertificateFilename', '');
+    
+    try
+        data = webread(endpoint, options);
         disp(data);
+        
         x = [data.x];
         y = [data.y];
         z = [data.z];
+        
         timestamps = {data.created_at};
         timestamps = datetime(timestamps, 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSSSS''Z''', 'TimeZone', 'UTC');
         timestamps_num = datenum(timestamps);
-
+        
         subplot(3, 1, 1);
         set(findobj('DisplayName', 'X'), 'XData', timestamps_num, 'YData', x);
         set(findobj('DisplayName', 'Y'), 'XData', timestamps_num, 'YData', y);
@@ -74,31 +68,34 @@ function updateData(~, ~)
         fft_x = FastFourierTransform(x);
         fft_y = FastFourierTransform(y);
         fft_z = FastFourierTransform(z);
-
+        
         subplot(3, 1, 2);
         freq_index = 0:length(fft_x)-1;
         set(findobj('DisplayName', 'FFT X'), 'XData', freq_index, 'YData', fft_x);
         set(findobj('DisplayName', 'FFT Y'), 'XData', freq_index, 'YData', fft_y);
         set(findobj('DisplayName', 'FFT Z'), 'XData', freq_index, 'YData', fft_z);
-            
+        
         logDec_x = LogarithmicDecrement(fft_x);
         logDec_y = LogarithmicDecrement(fft_y);
         logDec_z = LogarithmicDecrement(fft_z);
-
+        
         subplot(3, 1, 3);
         set(findobj('DisplayName', 'Log Dec X'), 'XData', freq_index, 'YData', logDec_x);
         set(findobj('DisplayName', 'Log Dec Y'), 'XData', freq_index, 'YData', logDec_y);
         set(findobj('DisplayName', 'Log Dec Z'), 'XData', freq_index, 'YData', logDec_z);
+        
         fuzzyCategoryX = FuzzyClassification(logDec_x);
         fuzzyCategoryY = FuzzyClassification(logDec_y);
         fuzzyCategoryZ = FuzzyClassification(logDec_z);
-        fprintf("Status for X: %s\n", fuzzyCategoryX);
-        fprintf("Status for Y: %s\n", fuzzyCategoryY);
-        fprintf("Status for Z: %s\n", fuzzyCategoryZ);
-
+        
+        fprintf("Status untuk X: %s\n", fuzzyCategoryX);
+        fprintf("Status untuk Y: %s\n", fuzzyCategoryY);
+        fprintf("Status untuk Z: %s\n", fuzzyCategoryZ);
+        
         drawnow;
-    else
-        disp("Error: " + response.StatusCode);
+        
+    catch ME
+        disp("Error: " + ME.message);
     end
 end
 
