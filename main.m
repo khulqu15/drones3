@@ -15,7 +15,6 @@ mass = 1.0;
 k = 0.5;
 alpha = k * (gravity / mass);
 
-% TSMC Controller Initialization
 lambda = 2;
 eta = 1.5;
 k_tsmc = 1.0;
